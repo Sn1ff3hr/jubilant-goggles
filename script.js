@@ -122,7 +122,6 @@ const ENDPOINT = 'https://white-dawn-9dc9.ignite-metis.workers.dev/';
 // IMPORTANT: The user must replace 'YOUR_SECRET_KEY' with their actual secret key.
 // This key should be stored securely and ideally not hardcoded in a real application.
 const SECRET_KEY = 'YOUR_SECRET_KEY';
-
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){

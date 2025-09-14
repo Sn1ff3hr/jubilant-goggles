@@ -118,7 +118,10 @@ document.body.addEventListener('click', (e)=>{
 });
 
 // ===== Submit to Worker (loader + toast) =====
-const ENDPOINT = '/submit-order';
+const ENDPOINT = 'https://white-dawn-9dc9.ignite-metis.workers.dev/';
+// IMPORTANT: The user must replace 'YOUR_SECRET_KEY' with their actual secret key.
+// This key should be stored securely and ideally not hardcoded in a real application.
+const SECRET_KEY = 'YOUR_SECRET_KEY';
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){
@@ -150,7 +153,10 @@ $('#accept').addEventListener('click', async ()=>{
   try{
     const res = await fetch(ENDPOINT, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SECRET_KEY}`
+      },
       body: JSON.stringify(rows)
     });
     // hide loader -> show toast

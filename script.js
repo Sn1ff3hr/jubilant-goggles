@@ -163,7 +163,6 @@ const ENDPOINT = 'https://solitary-leaf-f8a9.ignite-metis.workers.dev/'; // Usin
 // IMPORTANT: The user must replace 'YOUR_SECRET_KEY_TO_WORKER' with the actual secret key (bearer token)
 // that the Cloudflare Worker will expect.
 const SECRET_KEY_TO_WORKER = 'YOUR_SECRET_KEY_TO_WORKER';
-
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){

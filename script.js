@@ -9,6 +9,38 @@ const SIGN_P256_PUB_JWK = { "crv": "P-256", "ext": true, "key_ops": [ "verify" ]
 async function importPubJwk(jwk){
   return crypto.subtle.importKey('jwk', jwk, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
 }
+
+// ---- Worker key pin check (runs once) ----
+const ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
+const SIGN_P256_PUB_FINGERPRINT_SHA256 = '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';
+
+async function spkiFpSha256FromJwk(jwk){
+  const pubKey = await importPubJwk(jwk);
+  const spki = await crypto.subtle.exportKey('spki', pubKey);
+  const h = await crypto.subtle.digest('SHA-256', spki);
+  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+async function assertWorkerKeyMatchesPin(){
+  try{
+    const r = await fetch(`${ENDPOINT}/.well-known/signing-key`, { cache: 'no-store' });
+    const { jwk, fingerprint } = await r.json();
+
+    if (fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256) {
+      throw new Error('Worker fingerprint mismatch');
+    }
+    if (jwk) {
+      const fp = await spkiFpSha256FromJwk(jwk);
+      if (fp !== SIGN_P256_PUB_FINGERPRINT_SHA256) {
+        throw new Error('Public JWK fingerprint mismatch');
+      }
+    }
+    // ok
+  } catch (e){
+    console.warn('Pin check skipped:', e.message);
+  }
+}
+
 // Helper: verify signature
 async function verifySignature(publicJwk, payloadUint8, sigBytes){
   const key = await importPubJwk(publicJwk);

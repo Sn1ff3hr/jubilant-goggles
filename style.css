@@ -7,7 +7,11 @@
 html,body{margin:0;padding:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0e1324,#0b1720,#151a2e);color:var(--fg);min-height:100%}
 body{display:flex;align-items:center;justify-content:center}
 .wrap{width:100%;max-width:1200px;margin:auto;padding:2rem 1rem}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;gap:1.5rem}
+.brand{display:flex;flex-direction:column;gap:.35rem;max-width:100%}
+.brand h1{margin:0;font-size:1.9rem;line-height:1.2}
+.tagline{margin:0;font-size:1rem;color:var(--muted);font-weight:600}
+.nowrap{white-space:nowrap}
 h1{margin:0;font-size:1.8rem}
 .controls{display:flex;gap:.5rem}
 .toggle{padding:.5rem 1rem;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;font-weight:700;cursor:pointer}

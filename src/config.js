@@ -1,5 +1,5 @@
 // Your Worker endpoint (public)
-export const ENDPOINT = 'https://your-worker.workers.dev/';
+export const ENDPOINT = 'https://solitary-leaf-f8a9.ignite-metis.workers.dev/';
 
 // Pinned fingerprint (SHA-256 over SPKI of the signing public key) — PUBLIC
 export const SIGN_P256_PUB_FINGERPRINT_SHA256 =

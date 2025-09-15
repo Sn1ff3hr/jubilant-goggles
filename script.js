@@ -3,45 +3,25 @@ const IVA_RATE = 0.15;
 const LOCALE = { es: 'es-EC', en: 'en-US' };
 let currentLang = 'es';
 
-// ===== Cryptography & Security =====
-/**
- * --- SECURITY MODEL ---
- * This script uses a dual-layer security model to communicate with the worker:
- *
- * 1. AUTHENTICATION (Bearer Token):
- *    - To prove its identity to the worker, this script sends a secret "Bearer Token"
- *      in the 'Authorization' header of its request.
- *
- * 2. RESPONSE VERIFICATION (ECDSA Signature):
- *    - To ensure the response from the worker is authentic and has not been tampered with,
- *      this script expects the worker to sign the response.
- *    - It uses the worker's public key (`SIGN_P256_PUB_JWK`) to verify the signature
- *      received in the 'X-Signature' header.
- */
-
-// Public key of the worker, used to verify its signatures.
 const SIGN_P256_PUB_JWK = { "crv": "P-256", "ext": true, "key_ops": [ "verify" ], "kty": "EC", "x": "t6eyN6jlsOfqq0Otdez9SJ0G7-K4eY5hHVmLZrtv-IA", "y": "SMc0C6cLu_nxoqbB4me4Qt8Opq9613uo7IeODcS6Ozw" };
 
-// Helper function to import the JWK public key.
+// Helper: import public JWK
 async function importPubJwk(jwk){
   return crypto.subtle.importKey('jwk', jwk, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
 }
-
-// Helper function to verify the signature.
+// Helper: verify signature
 async function verifySignature(publicJwk, payloadUint8, sigBytes){
   const key = await importPubJwk(publicJwk);
   return crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, sigBytes, payloadUint8);
 }
-
-// Helper to decode Base64URL string to Uint8Array
+// Helper: Base64URL → Uint8Array (with padding fix)
 function base64UrlToUint8Array(base64Url) {
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const outputArray = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; ++i) {
-    outputArray[i] = raw.charCodeAt(i);
-  }
-  return outputArray;
+  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  base64 += '='.repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
 }
 
 // ===== Data =====
@@ -57,7 +37,6 @@ const money = c => (c/100).toLocaleString(LOCALE[currentLang], { style:'currency
 function add(item){
   const line = cart.get(item.id) || { ...item, qty:0 };
   line.qty++; cart.set(item.id, line);
-  // visual feedback: in dark mode, turn the + Agregar button green for 2s
   const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
   if(isDark){
     const btn = document.querySelector(`button[data-act="add"][data-id="${item.id}"]`);
@@ -159,10 +138,7 @@ document.body.addEventListener('click', (e)=>{
 });
 
 // ===== Submit to Worker (loader + toast) =====
-const ENDPOINT = 'https://solitary-leaf-f8a9.ignite-metis.workers.dev/'; // Using the latest URL from the user
-// IMPORTANT: The user must replace 'YOUR_SECRET_KEY_TO_WORKER' with the actual secret key (bearer token)
-// that the Cloudflare Worker will expect.
-const SECRET_KEY_TO_WORKER = 'YOUR_SECRET_KEY_TO_WORKER';
+const ENDPOINT = 'https://solitary-leaf-f8a9.ignite-metis.workers.dev/';
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){
@@ -189,39 +165,25 @@ $('#accept').addEventListener('click', async ()=>{
     });
   });
 
-  // show loader, send, then toast
   loader.style.display = 'flex';
   try{
+    // simple CORS: no Authorization header, and Content-Type is text/plain
     const res = await fetch(ENDPOINT, {
       method:'POST',
-      headers:{
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SECRET_KEY_TO_WORKER}`
-      },
+      headers:{ 'Content-Type':'text/plain' },
       body: JSON.stringify(rows)
     });
 
-    // Get signature from header and response body text for verification
     const signatureB64 = res.headers.get('X-Signature');
-    const responseBodyText = await res.text(); // Get body as text to verify against
-
-    if (!signatureB64) {
-      throw new Error('Worker response is missing signature.');
-    }
+    const responseBodyText = await res.text();
+    if (!signatureB64) throw new Error('Worker response is missing signature.');
 
     const signatureBytes = base64UrlToUint8Array(signatureB64);
     const payloadUint8 = new TextEncoder().encode(responseBodyText);
-
     const isSignatureValid = await verifySignature(SIGN_P256_PUB_JWK, payloadUint8, signatureBytes);
+    if (!isSignatureValid) throw new Error('Invalid signature from worker.');
 
-    if (!isSignatureValid) {
-      throw new Error('Invalid signature from worker. The response may have been tampered with.');
-    }
-
-    // If signature is valid, we can now trust the response body.
     const result = JSON.parse(responseBodyText);
-
-    // hide loader -> show toast
     loader.style.display = 'none';
     if(res.ok){
       showToast(result.message || '¡Pedido enviado con éxito!');
@@ -231,7 +193,7 @@ $('#accept').addEventListener('click', async ()=>{
     }
   }catch(err){
     loader.style.display = 'none';
-    showToast(`Error: ${err.message}`); // More specific error
+    showToast(`Error: ${err.message}`);
   }
 });
 
@@ -239,21 +201,17 @@ $('#accept').addEventListener('click', async ()=>{
 async function init(){
   try {
     const response = await fetch('data.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     OPTIONS = data.OPTIONS;
     EXTRAS = data.EXTRAS;
-
     document.documentElement.setAttribute('data-theme','dark');
     buildOptions();
     buildExtras();
     render();
   } catch (error) {
     console.error('Failed to load data:', error);
-    // Handle error, e.g., by showing an error message to the user
   }
 }
-
 init();
+

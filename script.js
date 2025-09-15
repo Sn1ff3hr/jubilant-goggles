@@ -138,7 +138,7 @@ document.body.addEventListener('click', (e)=>{
 });
 
 // ===== Submit to Worker (loader + toast) =====
-const ENDPOINT = 'https://mussle-creashure.workers.dev/';
+const ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){

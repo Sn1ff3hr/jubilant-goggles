@@ -1,0 +1,15 @@
+{
+  "OPTIONS": [
+    { "id":"op1", "name":{ "es":"Opción 1", "en":"Option 1" }, "desc":{ "es":"Tortilla + Huevos + Chorizo + Bebida", "en":"Tortilla + Eggs + Sausage + Drink" }, "priceCents":320 },
+    { "id":"op2", "name":{ "es":"Opción 2", "en":"Option 2" }, "desc":{ "es":"Tortilla + Chorizo + Bebida", "en":"Tortilla + Sausage + Drink" }, "priceCents":270 },
+    { "id":"op3", "name":{ "es":"Opción 3", "en":"Option 3" }, "desc":{ "es":"Tortilla + Huevos + Bebida", "en":"Tortilla + Eggs + Drink" }, "priceCents":270 },
+    { "id":"op4", "name":{ "es":"Opción 4", "en":"Option 4" }, "desc":{ "es":"2 Tortilla + 2 Huevos + 2 Chorizo + 2 Bebida", "en":"2 Tortillas + 2 Eggs + 2 Sausages + 2 Drinks" }, "priceCents":640 }
+  ],
+  "EXTRAS": [
+    { "id":"ex_cafe", "name":{ "es":"Café", "en":"Coffee" }, "priceCents":70 },
+    { "id":"ex_cola", "name":{ "es":"Cola", "en":"Cola" }, "priceCents":70 },
+    { "id":"ex_chorizo", "name":{ "es":"Chorizo", "en":"Sausage" }, "priceCents":70 },
+    { "id":"ex_huevo", "name":{ "es":"Huevo", "en":"Egg" }, "priceCents":70 },
+    { "id":"ex_tortilla", "name":{ "es":"Tortilla", "en":"Tortilla" }, "priceCents":70 }
+  ]
+}

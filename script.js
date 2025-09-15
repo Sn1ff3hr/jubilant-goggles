@@ -166,11 +166,10 @@ $('#accept').addEventListener('click', async ()=>{
   });
 
   loader.style.display = 'flex';
-  try{
-    // simple CORS: no Authorization header, and Content-Type is text/plain
+  try {
     const res = await fetch(ENDPOINT, {
-      method:'POST',
-      headers:{ 'Content-Type':'text/plain' },
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(rows)
     });
 
@@ -184,16 +183,28 @@ $('#accept').addEventListener('click', async ()=>{
     if (!isSignatureValid) throw new Error('Invalid signature from worker.');
 
     const result = JSON.parse(responseBodyText);
-    loader.style.display = 'none';
-    if(res.ok){
+    if (res.ok) {
       showToast(result.message || '¡Pedido enviado con éxito!');
-      cart.clear(); render();
-    }else{
-      showToast(result.message || 'Error al enviar. Intenta de nuevo.');
+      cart.clear();
+      render();
+    } else {
+      // Server returned an error (e.g. 4xx, 5xx)
+      const errorMsg = result.message || 'An unknown server error occurred.';
+      showToast(`Error: ${errorMsg} Please try again.`);
     }
-  }catch(err){
+  } catch (err) {
+    console.error('Submit error:', err);
+    let userMessage = 'An unexpected error occurred. Please try again.';
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      userMessage = 'Network error. Please check your connection and try again.';
+    } else if (err.message.includes('signature')) {
+      userMessage = 'A security error occurred. Please reload the page and try again.';
+    } else if (err instanceof SyntaxError) {
+      userMessage = 'Error reading server response. Please try again later.';
+    }
+    showToast(userMessage, 3000);
+  } finally {
     loader.style.display = 'none';
-    showToast(`Error: ${err.message}`);
   }
 });
 
@@ -211,6 +222,20 @@ async function init(){
     render();
   } catch (error) {
     console.error('Failed to load data:', error);
+    const errContainer = $('#error-container');
+    errContainer.innerHTML = `
+      <div class="err-title">Application Error</div>
+      <p>Could not load essential application data.</p>
+      <p><strong>Troubleshooting:</strong></p>
+      <ul style="margin: 0; padding-left: 20px;">
+        <li>Please check your internet connection.</li>
+        <li>Try reloading the page.</li>
+        <li>If the problem persists, the site owner may need to check that the <code>data.json</code> file exists and is valid.</li>
+      </ul>
+    `;
+    errContainer.style.display = 'block';
+    // Hide the main content area as the app is not usable
+    $('.wrap').style.display = 'none';
   }
 }
 init();

@@ -2,6 +2,17 @@
   --fg:#e8eef6; --card:#161a2b; --line:#2b2f40; --muted:#a9b3c3;
   --op1:#7aa8ff; --op2:#22c3a6; --op3:#ff8ab3; --op4:#c466ff; --ex:#c3b5ff;
   --radius:14px; --gap:1rem; --pad:1rem;
+  --bg-dark-gradient:linear-gradient(180deg,#0e1324,#0b1720,#151a2e);
+  --bg-dark-solid:#0b1720;
+  --bg-light-seasonal-gradient:
+    radial-gradient(circle at 12% 18%,rgba(255,238,173,.85),rgba(255,238,173,0) 58%),
+    radial-gradient(circle at 86% 16%,rgba(255,196,164,.8),rgba(255,196,164,0) 60%),
+    radial-gradient(circle at 28% 82%,rgba(177,232,190,.75),rgba(177,232,190,0) 58%),
+    radial-gradient(circle at 78% 80%,rgba(184,223,255,.7),rgba(184,223,255,0) 60%),
+    linear-gradient(135deg,#fff6d8 0%,#ffe5c4 28%,#ffeaf4 58%,#e1f6ff 78%,#d6f5d5 100%);
+  --bg-light-solid:#fff4d8;
+  --bg-gradient:var(--bg-dark-gradient);
+  --bg-solid:var(--bg-dark-solid);
 }
 
 *{box-sizing:border-box}
@@ -9,9 +20,14 @@ html,body{
   margin:0;
   padding:0;
   font-family:Inter,system-ui,"Segoe UI",Roboto,Arial,sans-serif;
-  background:linear-gradient(180deg,#0e1324,#0b1720,#151a2e);
+  background:var(--bg-gradient);
+  background-repeat:no-repeat;
+  background-attachment:fixed;
+  background-size:cover;
+  background-color:var(--bg-solid);
   color:var(--fg);
   min-height:100%;
+  transition:background .8s ease,background-color .8s ease;
 }
 body{
   min-height:100vh;
@@ -19,6 +35,16 @@ body{
   align-items:flex-start;
   justify-content:center;
   padding:clamp(1.5rem,2vw+1rem,3rem) clamp(.75rem,1.5vw+.5rem,2.5rem);
+}
+
+html[data-theme="dark"]{
+  --bg-gradient:var(--bg-dark-gradient);
+  --bg-solid:var(--bg-dark-solid);
+}
+
+html[data-theme="light"]{
+  --bg-gradient:var(--bg-light-seasonal-gradient);
+  --bg-solid:var(--bg-light-solid);
 }
 
 .wrap{
@@ -173,5 +199,4 @@ aside.card{display:flex;flex-direction:column}
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
 }
 
-[data-theme="light"] body{background:linear-gradient(135deg,#f3fbf7,#eaf2ff,#ffe9ef)}
 [data-theme="light"] .btn-adding{background:#22c3a6 !important;color:#0b0f18 !important}

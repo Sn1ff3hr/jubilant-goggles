@@ -179,12 +179,12 @@ function showWarning(key,{title,body,list}){
 }
 
 // ===== WebCrypto helpers =====
-async function importPubJwk(jwk){
+async function importPubJwk(jwk, { extractable = false } = {}){
   if(!canUseWebCrypto) throw new Error('WebCrypto unavailable');
-  return crypto.subtle.importKey('jwk', jwk, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
+  return crypto.subtle.importKey('jwk', jwk, {name:'ECDSA', namedCurve:'P-256'}, extractable, ['verify']);
 }
 async function spkiFpSha256FromJwk(jwk){
-  const pubKey = await importPubJwk(jwk);
+  const pubKey = await importPubJwk(jwk, { extractable: true });
   const spki = await crypto.subtle.exportKey('spki', pubKey);
   const h = await crypto.subtle.digest('SHA-256', spki);
   return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();

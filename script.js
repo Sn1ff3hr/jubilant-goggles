@@ -1,3 +1,4 @@
+
 // ===== Constants & configuration =====
 const IVA_RATE = 0.15;
 const LOCALE = { es: 'es-EC', en: 'en-US' };

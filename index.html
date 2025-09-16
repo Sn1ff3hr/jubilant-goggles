@@ -3,13 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self' https://solitary-leaf-f8a9.mussle-creashure.workers.dev; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' https://fonts.googleapis.com">
   <meta name="description" content="Ordena fácilmente en Las Tortillas de Sauces 3 (LasTortillasdeSauces3) con nuestra experiencia digital segura y rápida.">
+  <meta name="robots" content="index,follow">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="color-scheme" content="dark light">
   <title>Las Tortillas de Sauces 3 — Orden Rápida LasTortillasdeSauces3</title>
+  <link rel="canonical" href="https://lastortillasdesauces3.com/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="error-container" style="display: none;"></div>
+  <div id="error-container" class="hidden" role="alert"></div>
   <div class="wrap">
     <header>
       <div class="brand" aria-label="Las Tortillas de Sauces 3, también conocida como LasTortillasdeSauces3">
@@ -17,35 +24,35 @@
         <p class="tagline">Orden Rápida oficial de <span class="nowrap">LasTortillasdeSauces3</span></p>
       </div>
       <div class="controls">
-        <button id="lang" class="toggle" aria-label="EN/ES">ES</button>
-        <button id="theme" class="toggle" aria-label="Light/Dark">🌙</button>
+        <button id="lang" class="toggle" type="button" aria-label="EN/ES">ES</button>
+        <button id="theme" class="toggle" type="button" aria-label="Light/Dark">🌙</button>
       </div>
     </header>
 
     <div class="layout">
       <!-- LEFT: Opciones + Extras -->
       <section class="card">
-        <h2 class="title">Opciones</h2>
+        <h2 id="options-title" class="title">Opciones</h2>
         <div id="opts" class="grid"></div>
 
-        <div class="card" style="margin-top:14px">
-          <h2 class="title">Extras</h2>
+        <div class="card extras-card">
+          <h2 id="extras-title" class="title">Extras</h2>
           <div id="extras" class="ex-list"></div>
         </div>
       </section>
 
       <!-- RIGHT: Resumen -->
       <aside class="card">
-        <h2 class="title">Resumen</h2>
+        <h2 id="summary-title" class="title">Resumen</h2>
         <div id="cart" class="cart" aria-live="polite" aria-atomic="true"></div>
 
         <div class="totals" aria-live="polite" aria-atomic="true">
-          <div class="row"><div>Subtotal</div><div id="subtotal">—</div></div>
-          <div class="row"><div>IVA (15%)</div><div id="vat">—</div></div>
-          <div class="row"><div class="grand">TOTAL</div><div id="total" class="grand">—</div></div>
+          <div class="row"><div id="subtotal-label">Subtotal</div><div id="subtotal">—</div></div>
+          <div class="row"><div id="vat-label">IVA (15%)</div><div id="vat">—</div></div>
+          <div class="row"><div id="total-label" class="grand">TOTAL</div><div id="total" class="grand">—</div></div>
         </div>
 
-        <button id="accept" class="accept-btn">Aceptar</button>
+        <button id="accept" class="accept-btn" type="button">Aceptar</button>
       </aside>
     </div>
   </div>

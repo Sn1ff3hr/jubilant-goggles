@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Worker Insert Verification Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Manual test harness for verifying signed responses from the production worker.">
+</head>
+<body>
+  <h1>Worker Insert Verification Test</h1>
+  <p>Open the developer console to inspect the verified JSON payload. This script sends a sample payload to the Worker and validates the response signature using the published public key.</p>
+  <script>
+(async () => {
+  const WORKER_URL = 'https://rapid-pine-49ba.mussle-creashure.workers.dev';     // e.g., https://ops-worker.example.workers.dev
+  const INSERT_URL  = WORKER_URL + '/insert';
+  const KEY_URL     = WORKER_URL + '/.well-known/signing-key';
+
+  function b64uToBytes(b64u){
+    const pad = '='.repeat((4 - b64u.length % 4) % 4);
+    const b64 = (b64u + pad).replace(/-/g,'+').replace(/_/g,'/');
+    const bin = atob(b64); const arr = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  }
+
+  const jwk = (await (await fetch(KEY_URL, { cache:'no-store' })).json()).jwk;
+  if (!jwk) throw new Error('No public JWK');
+  const verifyKey = await crypto.subtle.importKey('jwk', jwk, { name:'ECDSA', namedCurve:'P-256' }, true, ['verify']);
+
+  const rows = [{ item:'Coffee Americano', qty:2, subtotal:4.00, vat:0.48, total:4.48 }];
+  const resp = await fetch(INSERT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rows) });
+
+  const sigB64u = resp.headers.get('X-Signature') || '';
+  const bodyText = await resp.clone().text();
+  const ok = await crypto.subtle.verify({ name:'ECDSA', hash:'SHA-256' }, verifyKey, b64uToBytes(sigB64u), new TextEncoder().encode(bodyText));
+
+  if (!ok) throw new Error('Signature verification failed');
+  console.log('Verified JSON:', JSON.parse(bodyText));
+})();
+  </script>
+</body>
+</html>

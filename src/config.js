@@ -1,5 +1,5 @@
 // config.js for Your Worker endpoint (public)
-export const ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
+export const ENDPOINT = 'https://rapid-pine-49ba.mussle-creashure.workers.dev';
 // Pinned fingerprint (SHA-256 over SPKI of the signing public key) — PUBLIC
 export const SIGN_P256_PUB_FINGERPRINT_SHA256 =
   '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';

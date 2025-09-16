@@ -66,8 +66,15 @@ const TEXT = {
   cartAriaLabel: { es:'Artículos en el carrito', en:'Items in cart' }
 };
 
-const WORKER_ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev';
-const WORKER_SIGNING_KEY_PATH = '.well-known/signing-key';
+const WORKER_ENDPOINT = 'https://rapid-pine-49ba.mussle-creashure.workers.dev';
+const WORKER_SIGNING_KEY_PATH = '/.well-known/signing-key';
+const WORKER_INSERT_PATH = '/insert';
+const WORKER_KEY_FETCH_ALLOWED_ORIGINS = new Set([
+  'https://lastortillasdesauces3.com',
+  'https://www.lastortillasdesauces3.com',
+  'https://rapid-pine-49ba.mussle-creashure.workers.dev'
+]);
+const WORKER_KEY_FETCH_LOCALHOST_PREFIXES = ['http://localhost', 'http://127.0.0.1'];
 const EXPECTED_SUBMIT_ERROR_CODES = new Set(['missing-signature','invalid-signature','invalid-content-type','invalid-json']);
 const SIGN_P256_PUB_FINGERPRINT_SHA256 = '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';
 const SIGN_P256_PUB_JWK = { "crv": "P-256", "ext": true, "key_ops": [ "verify" ], "kty": "EC", "x": "t6eyN6jlsOfqq0Otdez9SJ0G7-K4eY5hHVmLZrtv-IA", "y": "SMc0C6cLu_nxoqbB4me4Qt8Opq9613uo7IeODcS6Ozw" };
@@ -189,31 +196,67 @@ async function spkiFpSha256FromJwk(jwk){
   const h = await crypto.subtle.digest('SHA-256', spki);
   return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
 }
+function shouldAttemptWorkerKeyFetch(signingKeyUrl){
+  try{
+    if(!globalThis.location) return false;
+    const pageOrigin = globalThis.location.origin;
+    if(!pageOrigin || pageOrigin === 'null') return false;
+    const workerOrigin = new URL(signingKeyUrl).origin;
+    if(pageOrigin === workerOrigin) return true;
+    if(WORKER_KEY_FETCH_ALLOWED_ORIGINS.has(pageOrigin)) return true;
+    if(WORKER_KEY_FETCH_LOCALHOST_PREFIXES.some(prefix => pageOrigin.startsWith(prefix))) return true;
+  }catch(_err){
+    return false;
+  }
+  return false;
+}
+async function verifyPinnedKeyLocally(){
+  const fpLocal = await spkiFpSha256FromJwk(SIGN_P256_PUB_JWK);
+  if(fpLocal !== SIGN_P256_PUB_FINGERPRINT_SHA256) throw new Error('Public JWK fingerprint mismatch');
+}
 async function assertWorkerKeyMatchesPin(){
   if(!canUseWebCrypto || typeof fetch !== 'function') return;
-  try{
-    const signingKeyUrl = joinUrl(WORKER_ENDPOINT, WORKER_SIGNING_KEY_PATH);
-    const r = await fetch(signingKeyUrl, { cache:'no-store', credentials:'omit' });
-    if(r.status === 401 || r.status === 403){
-      console.info('Pin check skipped: worker denied access.');
-      return;
-    }
-    if(r.status === 404 || r.status === 405){
-      console.info(`Pin check not supported by worker (status ${r.status}).`);
-      return;
-    }
-    if(r.ok){
-      const { jwk, fingerprint } = await r.json();
-      if(fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256){
-        throw new Error('Worker fingerprint mismatch');
+  const signingKeyUrl = joinUrl(WORKER_ENDPOINT, WORKER_SIGNING_KEY_PATH);
+  let remoteCheckSucceeded = false;
+
+  if(shouldAttemptWorkerKeyFetch(signingKeyUrl)){
+    try{
+      const r = await fetch(signingKeyUrl, { cache:'no-store', credentials:'omit', mode:'cors', referrerPolicy:'no-referrer' });
+      if(r.status === 401 || r.status === 403){
+        console.info('Pin check skipped: worker denied access.');
+      }else if(r.status === 404 || r.status === 405){
+        console.info(`Pin check not supported by worker (status ${r.status}).`);
+      }else if(r.ok){
+        const { jwk, fingerprint } = await r.json();
+        if(fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256){
+          throw new Error('Worker fingerprint mismatch');
+        }
+        if(jwk){
+          const fp = await spkiFpSha256FromJwk(jwk);
+          if(fp !== SIGN_P256_PUB_FINGERPRINT_SHA256) throw new Error('Public JWK fingerprint mismatch');
+        }
+        remoteCheckSucceeded = true;
       }
-      if(jwk){
-        const fp = await spkiFpSha256FromJwk(jwk);
-        if(fp !== SIGN_P256_PUB_FINGERPRINT_SHA256) throw new Error('Public JWK fingerprint mismatch');
+    }catch(error){
+      if(error instanceof TypeError){
+        console.info('Pin check skipped: remote signing key endpoint is not accessible from this origin.');
+      }else{
+        const message = error && typeof error.message === 'string' ? error.message : String(error);
+        console.warn('Pin check skipped:', message);
       }
     }
-  }catch(e){
-    console.warn('Pin check skipped:', e.message);
+  }else{
+    console.info('Pin check skipped: origin not allowlisted for remote worker key fetch.');
+  }
+
+  if(!remoteCheckSucceeded){
+    try{
+      await verifyPinnedKeyLocally();
+    }catch(error){
+      const message = error && typeof error.message === 'string' ? error.message : String(error);
+      console.error('Pinned worker key fingerprint mismatch:', message);
+      throw error;
+    }
   }
 }
 function base64UrlToUint8Array(base64Url){
@@ -552,7 +595,8 @@ if(acceptButton){
     if(loader) loader.style.display = 'flex';
 
     try{
-      const res = await fetch(WORKER_ENDPOINT, {
+      const insertUrl = joinUrl(WORKER_ENDPOINT, WORKER_INSERT_PATH);
+      const res = await fetch(insertUrl, {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify(rows)

@@ -1,60 +1,10 @@
 // ===== Config =====
+import { ENDPOINT } from './src/config.js';
+import { assertWorkerKeyMatchesPin, verifySignedResponse } from './src/verify-worker.js';
+
 const IVA_RATE = 0.15;
 const LOCALE = { es: 'es-EC', en: 'en-US' };
 let currentLang = 'es';
-
-const SIGN_P256_PUB_JWK = { "crv": "P-256", "ext": true, "key_ops": [ "verify" ], "kty": "EC", "x": "t6eyN6jlsOfqq0Otdez9SJ0G7-K4eY5hHVmLZrtv-IA", "y": "SMc0C6cLu_nxoqbB4me4Qt8Opq9613uo7IeODcS6Ozw" };
-
-// Helper: import public JWK
-async function importPubJwk(jwk){
-  return crypto.subtle.importKey('jwk', jwk, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
-}
-
-// ---- Worker key pin check (runs once) ----
-const WORKER_ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
-const SIGN_P256_PUB_FINGERPRINT_SHA256 = '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';
-
-async function spkiFpSha256FromJwk(jwk){
-  const pubKey = await importPubJwk(jwk);
-  const spki = await crypto.subtle.exportKey('spki', pubKey);
-  const h = await crypto.subtle.digest('SHA-256', spki);
-  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
-}
-
-async function assertWorkerKeyMatchesPin(){
-  try{
-    const r = await fetch(`${WORKER_ENDPOINT}/.well-known/signing-key`, { cache: 'no-store' });
-    const { jwk, fingerprint } = await r.json();
-
-    if (fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256) {
-      throw new Error('Worker fingerprint mismatch');
-    }
-    if (jwk) {
-      const fp = await spkiFpSha256FromJwk(jwk);
-      if (fp !== SIGN_P256_PUB_FINGERPRINT_SHA256) {
-        throw new Error('Public JWK fingerprint mismatch');
-      }
-    }
-    // ok
-  } catch (e){
-    console.warn('Pin check skipped:', e.message);
-  }
-}
-
-// Helper: verify signature
-async function verifySignature(publicJwk, payloadUint8, sigBytes){
-  const key = await importPubJwk(publicJwk);
-  return crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, sigBytes, payloadUint8);
-}
-// Helper: Base64URL → Uint8Array (with padding fix)
-function base64UrlToUint8Array(base64Url) {
-  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  base64 += '='.repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
 
 // ===== Data =====
 let OPTIONS = [];
@@ -198,7 +148,7 @@ $('#accept').addEventListener('click', async ()=>{
 
   loader.style.display = 'flex';
   try {
-    const res = await fetch(WORKER_ENDPOINT, {
+    const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(rows)
@@ -206,12 +156,7 @@ $('#accept').addEventListener('click', async ()=>{
 
     const signatureB64 = res.headers.get('X-Signature');
     const responseBodyText = await res.text();
-    if (!signatureB64) throw new Error('Worker response is missing signature.');
-
-    const signatureBytes = base64UrlToUint8Array(signatureB64);
-    const payloadUint8 = new TextEncoder().encode(responseBodyText);
-    const isSignatureValid = await verifySignature(SIGN_P256_PUB_JWK, payloadUint8, signatureBytes);
-    if (!isSignatureValid) throw new Error('Invalid signature from worker.');
+    await verifySignedResponse(responseBodyText, signatureB64);
 
     const result = JSON.parse(responseBodyText);
     if (res.ok) {

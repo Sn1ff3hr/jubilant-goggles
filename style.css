@@ -175,3 +175,5 @@ aside.card{display:flex;flex-direction:column}
 
 [data-theme="light"] body{background:linear-gradient(135deg,#f3fbf7,#eaf2ff,#ffe9ef)}
 [data-theme="light"] .btn-adding{background:#22c3a6 !important;color:#0b0f18 !important}
+[data-theme="light"] .brand h1{color:#000;font-weight:900}
+[data-theme="light"] .brand .tagline{color:#000;font-weight:700}

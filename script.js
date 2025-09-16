@@ -1,4 +1,13 @@
 
+// ===== Clickjacking guard =====
+if(globalThis.top && globalThis.top !== globalThis.self){
+  try{
+    globalThis.top.location = globalThis.self.location.href;
+  }catch(_err){
+    globalThis.self.location.replace('about:blank');
+  }
+}
+
 // ===== Constants & configuration =====
 const IVA_RATE = 0.15;
 const LOCALE = { es: 'es-EC', en: 'en-US' };
@@ -33,6 +42,7 @@ const TEXT = {
   toastSuccess: { es:'¡Pedido enviado con éxito!', en:'Order submitted successfully!' },
   toastEmpty: { es:'Carrito vacío', en:'Cart is empty' },
   toastNetwork: { es:'Error de red. Revisa tu conexión.', en:'Network error. Please check your connection.' },
+  toastUnauthorized: { es:'Solicitud no autorizada. Verifica las credenciales del servicio.', en:'Unauthorized request. Please check the service credentials.' },
   toastSignature: { es:'Se detectó un error de seguridad. Recarga la página.', en:'Security error detected. Please reload the page.' },
   toastUnexpected: { es:'Ocurrió un error inesperado. Intenta de nuevo.', en:'An unexpected error occurred. Please try again.' },
   toastResponse: { es:'No se pudo leer la respuesta del servidor.', en:'Unable to read the server response.' },
@@ -56,7 +66,9 @@ const TEXT = {
   cartAriaLabel: { es:'Artículos en el carrito', en:'Items in cart' }
 };
 
-const WORKER_ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
+const WORKER_ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev';
+const WORKER_SIGNING_KEY_PATH = '.well-known/signing-key';
+const EXPECTED_SUBMIT_ERROR_CODES = new Set(['missing-signature','invalid-signature','invalid-content-type','invalid-json']);
 const SIGN_P256_PUB_FINGERPRINT_SHA256 = '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';
 const SIGN_P256_PUB_JWK = { "crv": "P-256", "ext": true, "key_ops": [ "verify" ], "kty": "EC", "x": "t6eyN6jlsOfqq0Otdez9SJ0G7-K4eY5hHVmLZrtv-IA", "y": "SMc0C6cLu_nxoqbB4me4Qt8Opq9613uo7IeODcS6Ozw" };
 
@@ -72,6 +84,23 @@ const warningsShown = new Set();
 // ===== Helpers =====
 function deepClone(value){
   return JSON.parse(JSON.stringify(value));
+}
+function joinUrl(base, path){
+  try{
+    return new URL(path, base).toString();
+  }catch(_err){
+    const normalizedBase = base.replace(/\/+$/,'');
+    const normalizedPath = path.replace(/^\/+/, '');
+    return `${normalizedBase}/${normalizedPath}`;
+  }
+}
+function safeJsonParse(text){
+  if(!text) return { data:null, error:null };
+  try{
+    return { data: JSON.parse(text), error:null };
+  }catch(error){
+    return { data:null, error };
+  }
 }
 const $ = s => document.querySelector(s);
 function translate(key, replacements){
@@ -161,9 +190,18 @@ async function spkiFpSha256FromJwk(jwk){
   return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
 }
 async function assertWorkerKeyMatchesPin(){
-  if(!canUseWebCrypto) return;
+  if(!canUseWebCrypto || typeof fetch !== 'function') return;
   try{
-    const r = await fetch(`${WORKER_ENDPOINT}/.well-known/signing-key`, { cache:'no-store' });
+    const signingKeyUrl = joinUrl(WORKER_ENDPOINT, WORKER_SIGNING_KEY_PATH);
+    const r = await fetch(signingKeyUrl, { cache:'no-store', credentials:'omit' });
+    if(r.status === 401 || r.status === 403){
+      console.info('Pin check skipped: worker denied access.');
+      return;
+    }
+    if(r.status === 404 || r.status === 405){
+      console.info(`Pin check not supported by worker (status ${r.status}).`);
+      return;
+    }
     if(r.ok){
       const { jwk, fingerprint } = await r.json();
       if(fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256){
@@ -482,66 +520,120 @@ async function loadCatalog(){
 
 // ===== Submit handler =====
 const acceptButton = $('#accept');
+let isSubmitting = false;
 if(acceptButton){
   acceptButton.addEventListener('click', async ()=>{
-  if(cart.size === 0){ showToast(translate('toastEmpty')); return; }
-  if(!canUseWebCrypto){
-    showWarning('crypto', { title: translate('cryptoWarningTitle'), body: translate('cryptoWarningBody'), list: [] });
-    showToast(translate('cryptoWarningBody'), 3200);
-    return;
-  }
-  const rows = [];
-  cart.forEach(item=>{
-    const rowSubtotal = item.qty * item.priceCents;
-    const rowVAT = Math.round(rowSubtotal * IVA_RATE);
-    const rowTotal = rowSubtotal + rowVAT;
-    rows.push({
-      timestamp: new Date().toISOString(),
-      item: translateValue(item.name),
-      qty: item.qty,
-      subtotal: (rowSubtotal/100).toFixed(2),
-      vat: (rowVAT/100).toFixed(2),
-      total: (rowTotal/100).toFixed(2)
-    });
-  });
+    if(isSubmitting) return;
+    if(cart.size === 0){ showToast(translate('toastEmpty')); return; }
+    if(!canUseWebCrypto){
+      showWarning('crypto', { title: translate('cryptoWarningTitle'), body: translate('cryptoWarningBody'), list: [] });
+      showToast(translate('cryptoWarningBody'), 3200);
+      return;
+    }
 
-  if(loader) loader.style.display = 'flex';
-  try{
-    const res = await fetch(WORKER_ENDPOINT, {
-      method:'POST',
-      headers:{ 'Content-Type':'text/plain' },
-      body: JSON.stringify(rows)
+    const rows = [];
+    cart.forEach(item=>{
+      const rowSubtotal = item.qty * item.priceCents;
+      const rowVAT = Math.round(rowSubtotal * IVA_RATE);
+      const rowTotal = rowSubtotal + rowVAT;
+      rows.push({
+        timestamp: new Date().toISOString(),
+        item: translateValue(item.name),
+        qty: item.qty,
+        subtotal: (rowSubtotal/100).toFixed(2),
+        vat: (rowVAT/100).toFixed(2),
+        total: (rowTotal/100).toFixed(2)
+      });
     });
-    const signatureB64 = res.headers.get('X-Signature');
-    const responseBodyText = await res.text();
-    if(!signatureB64) throw new Error('Worker response is missing signature.');
-    const signatureBytes = base64UrlToUint8Array(signatureB64);
-    const payloadUint8 = new TextEncoder().encode(responseBodyText);
-    const isSignatureValid = await verifySignature(SIGN_P256_PUB_JWK, payloadUint8, signatureBytes);
-    if(!isSignatureValid) throw new Error('Invalid signature from worker.');
-    const result = JSON.parse(responseBodyText);
-    if(res.ok){
-      showToast(result.message || translate('toastSuccess'));
+
+    isSubmitting = true;
+    acceptButton.disabled = true;
+    acceptButton.setAttribute('aria-busy','true');
+    if(loader) loader.style.display = 'flex';
+
+    try{
+      const res = await fetch(WORKER_ENDPOINT, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(rows)
+      });
+      const signatureB64 = res.headers.get('X-Signature') || '';
+      const contentTypeHeader = res.headers.get('content-type') || '';
+      const normalizedType = contentTypeHeader.split(';')[0].trim().toLowerCase();
+      const isJson = normalizedType === 'application/json' || normalizedType.endsWith('+json');
+      const responseBodyText = await res.text();
+      let parsedBody = null;
+      let parseErr = null;
+      if(isJson){
+        const parsed = safeJsonParse(responseBodyText);
+        parsedBody = parsed.data;
+        parseErr = parsed.error;
+      }
+
+      if(res.status === 401 || res.status === 403){
+        const unauthorizedMsg = parsedBody && typeof parsedBody.message === 'string'
+          ? parsedBody.message
+          : translate('toastUnauthorized');
+        showToast(unauthorizedMsg, 3200);
+        return;
+      }
+
+      if(!res.ok){
+        const errorMsg = parsedBody && typeof parsedBody.message === 'string'
+          ? parsedBody.message
+          : `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`;
+        showToast(translate('toastServer', { msg: errorMsg }), 3200);
+        return;
+      }
+
+      if(!signatureB64){
+        const noSignatureError = new Error('Worker response is missing signature.');
+        noSignatureError.code = 'missing-signature';
+        throw noSignatureError;
+      }
+
+      const signatureBytes = base64UrlToUint8Array(signatureB64);
+      const payloadUint8 = new TextEncoder().encode(responseBodyText);
+      const isSignatureValid = await verifySignature(SIGN_P256_PUB_JWK, payloadUint8, signatureBytes);
+      if(!isSignatureValid){
+        const invalidSignatureError = new Error('Invalid signature from worker.');
+        invalidSignatureError.code = 'invalid-signature';
+        throw invalidSignatureError;
+      }
+
+      if(!isJson){
+        const formatError = new Error(`Unexpected response content type: ${contentTypeHeader.trim() || 'unknown'}`);
+        formatError.code = 'invalid-content-type';
+        throw formatError;
+      }
+
+      if(parseErr || !parsedBody){
+        const invalidJsonError = new Error('Worker response is not valid JSON.');
+        invalidJsonError.code = 'invalid-json';
+        throw invalidJsonError;
+      }
+
+      showToast(parsedBody.message || translate('toastSuccess'));
       cart.clear();
       renderCart();
-    }else{
-      const errorMsg = result.message || 'Server error';
-      showToast(translate('toastServer', { msg: errorMsg }));
+    }catch(err){
+      const logMethod = err && EXPECTED_SUBMIT_ERROR_CODES.has(err.code) ? console.warn : console.error;
+      logMethod.call(console, 'Submit error:', err);
+      if(err instanceof TypeError){
+        showToast(translate('toastNetwork'), 3000);
+      }else if(err.code === 'missing-signature' || err.code === 'invalid-signature'){
+        showToast(translate('toastSignature'), 3200);
+      }else if(err.code === 'invalid-content-type' || err.code === 'invalid-json'){
+        showToast(translate('toastResponse'), 3200);
+      }else{
+        showToast(translate('toastUnexpected'), 3200);
+      }
+    }finally{
+      if(loader) loader.style.display = 'none';
+      acceptButton.disabled = false;
+      acceptButton.removeAttribute('aria-busy');
+      isSubmitting = false;
     }
-  }catch(err){
-    console.error('Submit error:', err);
-    if(err instanceof TypeError && err.message === 'Failed to fetch'){
-      showToast(translate('toastNetwork'), 3000);
-    }else if(err.message && err.message.toLowerCase().includes('signature')){
-      showToast(translate('toastSignature'), 3200);
-    }else if(err instanceof SyntaxError){
-      showToast(translate('toastResponse'), 3200);
-    }else{
-      showToast(translate('toastUnexpected'), 3200);
-    }
-  }finally{
-    if(loader) loader.style.display = 'none';
-  }
   });
 }
 

@@ -11,7 +11,7 @@ async function importPubJwk(jwk){
 }
 
 // ---- Worker key pin check (runs once) ----
-const ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
+const WORKER_ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
 const SIGN_P256_PUB_FINGERPRINT_SHA256 = '9F3AE3BEE7B698BED9F41EBAEB22E32D11E087A301681F709872FD51B3C7CDFC';
 
 async function spkiFpSha256FromJwk(jwk){
@@ -23,7 +23,7 @@ async function spkiFpSha256FromJwk(jwk){
 
 async function assertWorkerKeyMatchesPin(){
   try{
-    const r = await fetch(`${ENDPOINT}/.well-known/signing-key`, { cache: 'no-store' });
+    const r = await fetch(`${WORKER_ENDPOINT}/.well-known/signing-key`, { cache: 'no-store' });
     const { jwk, fingerprint } = await r.json();
 
     if (fingerprint && fingerprint !== SIGN_P256_PUB_FINGERPRINT_SHA256) {
@@ -170,7 +170,6 @@ document.body.addEventListener('click', (e)=>{
 });
 
 // ===== Submit to Worker (loader + toast) =====
-const ENDPOINT = 'https://solitary-leaf-f8a9.mussle-creashure.workers.dev/';
 const loader = $('#loader');
 const toast  = $('#toast');
 function showToast(msg, ms=1800){
@@ -199,7 +198,7 @@ $('#accept').addEventListener('click', async ()=>{
 
   loader.style.display = 'flex';
   try {
-    const res = await fetch(ENDPOINT, {
+    const res = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(rows)
@@ -243,6 +242,7 @@ $('#accept').addEventListener('click', async ()=>{
 // ===== Init =====
 async function init(){
   try {
+    await assertWorkerKeyMatchesPin();
     const response = await fetch('data.json');
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();

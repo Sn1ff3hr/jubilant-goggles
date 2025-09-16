@@ -20,7 +20,7 @@ function base64UrlToBytes(b64u){
 // call once at startup (optional)
 export async function assertWorkerKeyMatchesPin(){
   try{
-    const r = await fetch(`${ENDPOINT}/.well-known/signing-key`);
+    const r = await fetch(`${ENDPOINT}/.well-known/signing-key`, { cache: 'no-store' });
     if (r.ok) {
       const { jwk, fingerprint } = await r.json();
       if (jwk) {

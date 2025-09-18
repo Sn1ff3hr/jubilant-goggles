@@ -474,7 +474,7 @@ function applyTheme(theme, persist=true){
   document.documentElement.setAttribute('data-theme', theme);
   if(persist) safeStorage('set', STORAGE_KEYS.theme, theme);
   const toggle = $('#theme');
-  if(toggle) toggle.textContent = theme === 'light' ? '🌞' : '🌙';
+  if(toggle) toggle.textContent = theme === 'light' ? 'Light' : 'Dark';
 }
 
 // ===== Toast & loader =====

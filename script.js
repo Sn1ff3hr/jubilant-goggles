@@ -22,9 +22,9 @@ const DEFAULT_DATA = {
   EXTRAS: [
     { id:'ex_cafe', name:{ es:'Café', en:'Coffee' }, priceCents:70 },
     { id:'ex_cola', name:{ es:'Cola', en:'Cola' }, priceCents:70 },
-    { id:'ex_chorizo', name:{ es:'Chorizo', en:'Sausage' }, priceCents:70 },
-    { id:'ex_huevo', name:{ es:'Huevo', en:'Egg' }, priceCents:70 },
-    { id:'ex_tortilla', name:{ es:'Tortilla', en:'Tortilla' }, priceCents:70 }
+    { id:'ex_chorizo', name:{ es:'Chorizo', en:'Sausage' }, priceCents:50 },
+    { id:'ex_huevo', name:{ es:'Huevo', en:'Egg' }, priceCents:50 },
+    { id:'ex_tortilla', name:{ es:'Tortilla', en:'Tortilla' }, priceCents:150 }
   ]
 };
 
